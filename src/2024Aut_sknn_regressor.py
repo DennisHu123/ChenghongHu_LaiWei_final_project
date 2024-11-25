@@ -16,9 +16,6 @@ import warnings
 warnings.filterwarnings("ignore")
 print("\nReady to continue.")
 
-#%%
-df = pd.read_csv(f'..{os.sep}data{os.sep}HousePricesAdv{os.sep}train.csv', header=0)
-
 #%%[markdown]
 # Project tasks and goals:
 # 
@@ -39,6 +36,16 @@ df = pd.read_csv(f'..{os.sep}data{os.sep}HousePricesAdv{os.sep}train.csv', heade
 # Please setup an appropriate .gitignore as the first thing when you create a repo. 
 # 
 # 
+#%%
+def preclean(data):
+    data = data.drop(columns=['MSSubClass','MSZoning','Street','Alley','LotShape','LandContour','Utilities','LotConfig','Neighborhood','Condition1','Condition2','BldgType','HouseStyle','RoofStyle','RoofMatl','Exterior1st','Exterior2nd','MasVnrType','Foundation','Heating','Electrical','Functional','GarageType','MiscFeature','SaleType','SaleCondition'],axis=1)
+    ordinary_columns = ['LandSlope','ExterQual','ExterCond','BsmtQual','BsmtCond','BsmtExposure','BsmtFinType1','BsmtFinType2','HeatingQC','CentralAir','KitchenQual','FireplaceQu','GarageFinish','GarageQual','GarageCond','PavedDrive','PoolQC','Fence','']
+    return data
+df_train = pd.read_csv(f'..{os.sep}data{os.sep}HousePricesAdv{os.sep}train.csv', header=0)
+df_test = df = pd.read_csv(f'..{os.sep}data{os.sep}HousePricesAdv{os.sep}test.csv', header=0)
+
+df_train.info()
+
 
 
 #%%
