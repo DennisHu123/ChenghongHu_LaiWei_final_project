@@ -61,15 +61,22 @@ def preclean(data):
     'Fence': {'NA': 0, 'MnWw': 1, 'GdWo': 2, 'MnPrv': 3, 'GdPrv': 4},  
     }
 
+    # Drop categorical columns
     data = data.drop(columns=['MSSubClass','MSZoning','Street','Alley','LotShape','LandContour','Utilities','LotConfig','Neighborhood','Condition1','Condition2','BldgType','HouseStyle','RoofStyle','RoofMatl','Exterior1st','Exterior2nd','MasVnrType','Foundation','Heating','Electrical','Functional','GarageType','MiscFeature','SaleType','SaleCondition'],axis=1)
+
 
     for column, mapping in mappings.items():
         if column in data.columns:
-            data[column] = data[column].map(mapping)
+            data[column] = data[column].map(mapping).fillna(0).astype(int)
+    
+    
+    # Remove NAs
+    # data = data.dropna()
 
     return data
 
 df_train = pd.read_csv(f'..{os.sep}data{os.sep}HousePricesAdv{os.sep}train.csv', header=0)
+print(df_train.shape)
 df_test = df = pd.read_csv(f'..{os.sep}data{os.sep}HousePricesAdv{os.sep}test.csv', header=0)
 
 df_test = preclean(df_test)
