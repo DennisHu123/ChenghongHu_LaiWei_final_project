@@ -376,3 +376,66 @@ df_history
 # %%
 history
 # %%
+# Compare with other models
+# Tree Regressor
+from sklearn.tree import DecisionTreeRegressor
+
+# Fit the model
+tree_model = DecisionTreeRegressor(random_state=1)
+tree_model.fit(df_train_x, df_train_y)
+
+# Feature Importance
+tree_feature_importance = tree_model.feature_importances_
+
+# Logistic Regression
+from sklearn.linear_model import LogisticRegression
+logit_model = LogisticRegression(random_state=1)
+logit_model.fit(df_train_x, df_train_y)
+
+# Normalize importance and treat negative/positive equivalently
+def normalize_coef(coefs):
+    abs_sum = np.sum(np.abs(coefs))
+    normalized_coefficients = coefs / abs_sum
+    return np.abs(normalized_coefficients)
+
+# Extract feature coefficients (importance)
+logit_coefficients = logit_model.coef_[0]
+logit_coefficients = normalize_coef(logit_coefficients)
+
+# SVC
+from sklearn.svm import SVC
+from sklearn.preprocessing import StandardScaler
+
+# Standardize the features
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(df_train_x)
+
+# Train an SVM with a linear kernel
+svm_model = SVC(kernel='linear', random_state=1)
+svm_model.fit(X_train_scaled, df_train_y)
+
+# Extract feature coefficients (importance)
+svm_coefficients = svm_model.coef_[0]
+svm_coefficients = normalize_coef(svm_coefficients)
+
+# Lasso Regression
+from sklearn.linear_model import Lasso
+lasso_model = Lasso(alpha=0.1, random_state=1)
+lasso_model.fit(X_train_scaled, df_train_y)
+
+# Extract feature coefficients (importance)
+lasso_coefficients = lasso_model.coef_
+lasso_coefficients = normalize_coef(lasso_coefficients)
+
+# Display feature importance
+importance_df = pd.DataFrame({
+    'Feature': df_train_x.columns,
+    'Tree': tree_feature_importance,
+    'SVM' : svm_coefficients,
+    'Logit': logit_coefficients,
+    'Lasso' : lasso_coefficients
+}).sort_values(by='Feature')
+
+print(importance_df)
+
+# %%
