@@ -62,7 +62,7 @@ def preclean(data):
     }
 
     # Drop categorical columns
-    data = data.drop(columns=['MSSubClass','MSZoning','Street','Alley','LotShape','LandContour','Utilities','LotConfig','Neighborhood','Condition1','Condition2','BldgType','HouseStyle','RoofStyle','RoofMatl','Exterior1st','Exterior2nd','MasVnrType','Foundation','Heating','Electrical','Functional','GarageType','MiscFeature','SaleType','SaleCondition'],axis=1)
+    data = data.drop(columns=['Id','MSSubClass','MSZoning','Street','Alley','LotShape','LandContour','Utilities','LotConfig','Neighborhood','Condition1','Condition2','BldgType','HouseStyle','RoofStyle','RoofMatl','Exterior1st','Exterior2nd','MasVnrType','Foundation','Heating','Electrical','Functional','GarageType','MiscFeature','SaleType','SaleCondition'],axis=1)
 
 
     for column, mapping in mappings.items():
@@ -71,20 +71,19 @@ def preclean(data):
     
     
     # Remove NAs
-    # data = data.dropna()
+    data = data.dropna()
 
     return data
 
 df_train = pd.read_csv(f'..{os.sep}data{os.sep}HousePricesAdv{os.sep}train.csv', header=0)
-print(df_train.shape)
 df_test = df = pd.read_csv(f'..{os.sep}data{os.sep}HousePricesAdv{os.sep}test.csv', header=0)
 
 df_test = preclean(df_test)
+df_test_x = df_test.iloc[:,:53]
+
 df_train = preclean(df_train)
-
-df_train.info()
-
-
+df_train_x = df_train.iloc[:,:53]
+df_train_y = df_train.iloc[:,-1]
 
 #%%
 print("\nReady to continue.")
@@ -120,7 +119,7 @@ class sknn:
                  caleExpos_init = (), 
                  scales_init = (), 
                  ttsplit=0.5, 
-                 max_iter = 100, 
+                 max_iter = 50, 
                  seed=1, 
                  scoredigits = 6, 
                  learning_rate_init = 0.1, 
@@ -229,17 +228,6 @@ class sknn:
         # nrows_Xtest is self.X_test.shape[0]   # False
         return
 
-    # def __setProbeExpos(self, expos):
-    #     '''
-    #     set Probing Exponents, a tuple
-    #     param expos: list/tuple of floats
-    #     :return: None
-    #     '''
-    #     # Can add more checks to ensure expos is numeric list/tuple
-    #     self.__probeExpos = expos if (len(expos)>2) else (-6, -3, -1, -0.5, 0, 0.5, 1, 1.5, 2, 4, 6) # tuple, exp(tuple) gives the scaling factors.
-    #     self.__probeFactors = tuple( [ math.exp(i) for i in self.__probeExpos ] )
-    #     return
-
     def __setExpos2Scales(self, expos=[]):
         """
         set Scaling Exponents, a tuple or list
@@ -253,8 +241,8 @@ class sknn:
         if (len(expos) != self.__xdim):
             self.__scaleExpos = np.zeros(self.__xdim) # tuple, exp(tuple) gives the scaling factors.
             if self.__xdim >1: 
-                self.__scaleExpos[0] = 1
-                self.__scaleExpos[1] = -1
+                self.__scaleExpos[0] = 0
+                self.__scaleExpos[1] = 0
         else:
             self.__scaleExpos =  expos
         self.__scaleFactors = np.array( [ math.exp(i) for i in self.__scaleExpos ] ) # numpy array
@@ -334,11 +322,12 @@ class sknn:
             maxiter (int, optional): max iteration. Defaults to 1e5.
             learning_rate (float, optional): learning_rate. Defaults to 0 or self.learning_rate
         """
-        maxi = max( self.max_iter, maxiter, 1000)
-        skip_n = 10 # rule of thumb math.floor(1/learning_rate)
+        history = []
+        maxi = max( self.max_iter, maxiter)
+        skip_n = 5 # rule of thumb math.floor(1/learning_rate)
         expos = scaleExpos_init 
         if (len(scaleExpos_init) == self.__xdim): self.__scaleExpos = scaleExpos_init # assumes the new input is the desired region.
-        print(f"Begin: \n__scaleExpos= {self.__scaleExpos}, \n__scaleFactors= {self.__scaleFactors}, \nmodel score-train is {self.scorethis(use='train')}, \nscore-test is {self.scorethis(use='test')}, \nmaxi= {maxi}, k={self.k}, learning_rate={self.learning_rate}\n")
+        print(f"Begin: \nmodel score-train is {self.scorethis(use='train')}, \nscore-test is {self.scorethis(use='test')}, \nmaxi= {maxi}, k={self.k}, learning_rate={self.learning_rate}\n")
         for i in range(maxi):
             grad = self.__evalGradients(learning_rate, use='train')
             # Cases
@@ -347,11 +336,15 @@ class sknn:
             # 3. maxiter reached, stop. (end of loop)
             # 4. ?? dy < tol, stop??            # 
             result = self.__setNewExposFromGrad(grad)
-            if (i<10 or i%skip_n==0 ): print(f"i: {i}, |grad|^2={np.dot(grad,grad)}, \ngrad= {grad}, \n__scaleExpos= {self.__scaleExpos}, \n__scaleFactors= {self.__scaleFactors}, \nmodel score-train is {self.scorethis(use='train')}, \nscore-test is {self.scorethis(use='test')}\n")
-            if not result: break
+            if (i<10 or i%skip_n==0 ): 
+                history.append([i,round(np.dot(grad,grad),self.__scoredigits),self.scorethis(use='train'),self.scorethis(use='test')])
+                print(f"i: {i}, |grad|^2={round(np.dot(grad,grad),self.__scoredigits)}, \nmodel score-train is {self.scorethis(use='train')}, \nscore-test is {self.scorethis(use='test')}\n")
+            if not result: 
+                break
             
-        if i==maxi-1: print(f"max iter reached. Current |grad|^2={np.dot(grad,grad)}, \ngrad= {grad}, \n__scaleExpos= {self.__scaleExpos}, \n__scaleFactors= {self.__scaleFactors}, \nmodel score-train is {self.scorethis(use='train')}, \nscore-test is {self.scorethis(use='test')}\n")
-            
+        if i==maxi-1: print(f"max iter reached. Current |grad|^2={np.dot(grad,grad)}, \nmodel score-train is {self.scorethis(use='train')}, \nscore-test is {self.scorethis(use='test')}\n")
+        
+        return history
     
     def scorethis(self, scaleExpos = [], scaleFactors = [], use = 'test'):
         if len(scaleExpos)==self.__xdim :
@@ -367,13 +360,19 @@ class sknn:
         self.__knnmodels[self.k].fit(sfactors*self.X_train, self.y_train)
         # For optimizing/tuning the scaling factors, use the train set to tune. 
         newscore = self.__knnmodels[self.k].score(sfactors*self.X_train, self.y_train) if use=='train' else self.__knnmodels[self.k].score(sfactors*self.X_test, self.y_test)
-        return newscore
+        return round(newscore,self.__scoredigits)
 
 ###### END class sknn
 
 #%%
-diabetes = sknn(data_x=data_x, data_y=data_y, learning_rate_init=0.01)
-diabetes.optimize()
-
+diabetes = sknn(data_x=df_train_x, data_y=df_train_y, k=13, classifier=False, learning_rate_init=0.2)
+history = diabetes.optimize()
+df_history = pd.DataFrame(columns=['iteration','grad_square','train_score','test_score'])
+for row in history:
+    df_history.loc[len(df_history)] = row
 
 #%%
+df_history
+# %%
+history
+# %%
