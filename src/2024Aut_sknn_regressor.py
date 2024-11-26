@@ -75,15 +75,15 @@ def preclean(data):
 
     return data
 
-df_train = pd.read_csv(f'..{os.sep}data{os.sep}HousePricesAdv{os.sep}train.csv', header=0)
-df_test = df = pd.read_csv(f'..{os.sep}data{os.sep}HousePricesAdv{os.sep}test.csv', header=0)
+df = pd.read_csv(f'..{os.sep}data{os.sep}HousePricesAdv{os.sep}train.csv', header=0)
+df_test = pd.read_csv(f'..{os.sep}data{os.sep}HousePricesAdv{os.sep}test.csv', header=0)
 
 df_test = preclean(df_test)
 df_test_x = df_test.iloc[:,:53]
 
-df_train = preclean(df_train)
-df_train_x = df_train.iloc[:,:53]
-df_train_y = df_train.iloc[:,-1]
+df = preclean(df)
+df_x = df.iloc[:,:53]
+df_y = df.iloc[:,-1]
 
 #%%
 print("\nReady to continue.")
@@ -343,8 +343,8 @@ class sknn:
                 break
             
         if i==maxi-1: print(f"max iter reached. Current |grad|^2={np.dot(grad,grad)}, \nmodel score-train is {self.scorethis(use='train')}, \nscore-test is {self.scorethis(use='test')}\n")
-        
-        return history
+        scaling_factor = self.__scaleFactors
+        return history, scaling_factor
     
     def scorethis(self, scaleExpos = [], scaleFactors = [], use = 'test'):
         if len(scaleExpos)==self.__xdim :
@@ -365,8 +365,8 @@ class sknn:
 ###### END class sknn
 
 #%%
-diabetes = sknn(data_x=df_train_x, data_y=df_train_y, k=13, classifier=False, learning_rate_init=0.2)
-history = diabetes.optimize()
+diabetes = sknn(data_x=df_x, data_y=df_y, k=13, classifier=False, learning_rate_init=0.2)
+history,knn_scaling_factors = diabetes.optimize()
 df_history = pd.DataFrame(columns=['iteration','grad_square','train_score','test_score'])
 for row in history:
     df_history.loc[len(df_history)] = row
@@ -378,7 +378,17 @@ history
 # %%
 # Compare with other models
 # Tree Regressor
+from sklearn.model_selection import train_test_split
+# data_y can be pd series here, or 
+dy = df_y.values if (isinstance(df_y, pd.core.series.Series) or isinstance(df_y, pd.core.frame.DataFrame)) else df_y # if (isinstance(data_y, np.ndarray)) # the default
+df_train_x, df_test_x, df_train_y, df_test_y = train_test_split(df_x, dy, test_size=0.01, random_state = 42)
+# these four sets should be all numpy ndarrays.
+
 from sklearn.tree import DecisionTreeRegressor
+def normalize_coef(coefs):
+    abs_sum = np.sum(np.abs(coefs))
+    normalized_coefficients = coefs / abs_sum
+    return np.abs(normalized_coefficients)
 
 # Fit the model
 tree_model = DecisionTreeRegressor(random_state=1)
@@ -386,6 +396,7 @@ tree_model.fit(df_train_x, df_train_y)
 
 # Feature Importance
 tree_feature_importance = tree_model.feature_importances_
+tree_feature_importance = normalize_coef(tree_feature_importance)
 
 # Logistic Regression
 from sklearn.linear_model import LogisticRegression
@@ -393,11 +404,9 @@ logit_model = LogisticRegression(random_state=1)
 logit_model.fit(df_train_x, df_train_y)
 
 # Normalize importance and treat negative/positive equivalently
-def normalize_coef(coefs):
-    abs_sum = np.sum(np.abs(coefs))
-    normalized_coefficients = coefs / abs_sum
-    return np.abs(normalized_coefficients)
 
+
+knn_scaling_factors = normalize_coef(knn_scaling_factors)
 # Extract feature coefficients (importance)
 logit_coefficients = logit_model.coef_[0]
 logit_coefficients = normalize_coef(logit_coefficients)
@@ -430,11 +439,12 @@ lasso_coefficients = normalize_coef(lasso_coefficients)
 # Display feature importance
 importance_df = pd.DataFrame({
     'Feature': df_train_x.columns,
+    'KNN': knn_scaling_factors,
     'Tree': tree_feature_importance,
     'SVM' : svm_coefficients,
     'Logit': logit_coefficients,
     'Lasso' : lasso_coefficients
-}).sort_values(by='Feature')
+}).sort_values(by='KNN',ascending=False)
 
 print(importance_df)
 
