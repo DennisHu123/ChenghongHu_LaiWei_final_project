@@ -103,9 +103,6 @@ class sknn:
     import matplotlib.pyplot as plt
     from sklearn.neighbors import KNeighborsClassifier
     from sklearn.neighbors import KNeighborsRegressor
-    # from sklearn.linear_model import LogisticRegression
-    # from sklearn.svm import SVC, LinearSVC
-    # from sklearn.tree import DecisionTreeClassifier
 
     # contructor and properties
     def __init__(self, 
@@ -119,7 +116,7 @@ class sknn:
                  caleExpos_init = (), 
                  scales_init = (), 
                  ttsplit=0.5, 
-                 max_iter = 50, 
+                 max_iter = 100, 
                  seed=1, 
                  scoredigits = 6, 
                  learning_rate_init = 0.1, 
@@ -324,17 +321,19 @@ class sknn:
         """
         history = []
         maxi = max( self.max_iter, maxiter)
-        skip_n = 5 # rule of thumb math.floor(1/learning_rate)
+        skip_n = 100 # rule of thumb math.floor(1/learning_rate)
         expos = scaleExpos_init 
         if (len(scaleExpos_init) == self.__xdim): self.__scaleExpos = scaleExpos_init # assumes the new input is the desired region.
         print(f"Begin: \nmodel score-train is {self.scorethis(use='train')}, \nscore-test is {self.scorethis(use='test')}, \nmaxi= {maxi}, k={self.k}, learning_rate={self.learning_rate}\n")
         for i in range(maxi):
             grad = self.__evalGradients(learning_rate, use='train')
-            # Cases
-            # 1. grad = 0, stop (built into __setNewExposFromGrad)
-            # 2. grad parallel to (1,1,1,...,1) direction, stop.
-            # 3. maxiter reached, stop. (end of loop)
-            # 4. ?? dy < tol, stop??            # 
+            
+            grad_norm = np.linalg.norm(grad)  # Compute gradient magnitude
+            # Stop conditions: grad parallel to (1,1,...,1)
+            if np.allclose(grad / grad_norm, np.ones(self.__xdim) / np.sqrt(self.__xdim)):  
+                print(f"Stopping at iteration {i}: gradient is parallel to (1,1,...,1).")
+                break
+
             result = self.__setNewExposFromGrad(grad)
             if (i<10 or i%skip_n==0 ): 
                 history.append([i,round(np.dot(grad,grad),self.__scoredigits),self.scorethis(use='train'),self.scorethis(use='test')])
@@ -384,6 +383,7 @@ dy = df_y.values if (isinstance(df_y, pd.core.series.Series) or isinstance(df_y,
 df_train_x, df_test_x, df_train_y, df_test_y = train_test_split(df_x, dy, test_size=0.01, random_state = 42)
 # these four sets should be all numpy ndarrays.
 
+# Normalize importance and treat negative/positive equivalently
 from sklearn.tree import DecisionTreeRegressor
 def normalize_coef(coefs):
     abs_sum = np.sum(np.abs(coefs))
@@ -398,15 +398,15 @@ tree_model.fit(df_train_x, df_train_y)
 tree_feature_importance = tree_model.feature_importances_
 tree_feature_importance = normalize_coef(tree_feature_importance)
 
+# Standardize the features
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(df_train_x)
+
 # Logistic Regression
 from sklearn.linear_model import LogisticRegression
 logit_model = LogisticRegression(random_state=1)
-logit_model.fit(df_train_x, df_train_y)
+logit_model.fit(X_train_scaled, df_train_y)
 
-# Normalize importance and treat negative/positive equivalently
-
-
-knn_scaling_factors = normalize_coef(knn_scaling_factors)
 # Extract feature coefficients (importance)
 logit_coefficients = logit_model.coef_[0]
 logit_coefficients = normalize_coef(logit_coefficients)
@@ -414,10 +414,6 @@ logit_coefficients = normalize_coef(logit_coefficients)
 # SVC
 from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler
-
-# Standardize the features
-scaler = StandardScaler()
-X_train_scaled = scaler.fit_transform(df_train_x)
 
 # Train an SVM with a linear kernel
 svm_model = SVC(kernel='linear', random_state=1)
@@ -435,6 +431,9 @@ lasso_model.fit(X_train_scaled, df_train_y)
 # Extract feature coefficients (importance)
 lasso_coefficients = lasso_model.coef_
 lasso_coefficients = normalize_coef(lasso_coefficients)
+
+#Normalize knn_scaling_factors
+knn_scaling_factors = normalize_coef(knn_scaling_factors)
 
 # Display feature importance
 importance_df = pd.DataFrame({
