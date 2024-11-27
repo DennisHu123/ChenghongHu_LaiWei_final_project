@@ -8,6 +8,7 @@ import rfit
 import matplotlib.pyplot as plt
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.neighbors import KNeighborsRegressor
+from sklearn.preprocessing import StandardScaler
 # from sklearn.linear_model import LogisticRegression
 # from sklearn.svm import SVC, LinearSVC
 # from sklearn.tree import DecisionTreeClassifier
@@ -372,16 +373,14 @@ for row in history:
 
 #%%
 df_history
-# %%
-history
+
 # %%
 # Compare with other models
 # Tree Regressor
+performance = {}
 from sklearn.model_selection import train_test_split
-# data_y can be pd series here, or 
 dy = df_y.values if (isinstance(df_y, pd.core.series.Series) or isinstance(df_y, pd.core.frame.DataFrame)) else df_y # if (isinstance(data_y, np.ndarray)) # the default
-df_train_x, df_test_x, df_train_y, df_test_y = train_test_split(df_x, dy, test_size=0.01, random_state = 42)
-# these four sets should be all numpy ndarrays.
+df_train_x, df_test_x, df_train_y, df_test_y = train_test_split(df_x, dy, test_size=0.5, random_state = 1)
 
 # Normalize importance and treat negative/positive equivalently
 from sklearn.tree import DecisionTreeRegressor
@@ -393,7 +392,7 @@ def normalize_coef(coefs):
 # Fit the model
 tree_model = DecisionTreeRegressor(random_state=1)
 tree_model.fit(df_train_x, df_train_y)
-
+performance['tree'] = tree_model.score(df_test_x,df_test_y)
 # Feature Importance
 tree_feature_importance = tree_model.feature_importances_
 tree_feature_importance = normalize_coef(tree_feature_importance)
@@ -401,12 +400,13 @@ tree_feature_importance = normalize_coef(tree_feature_importance)
 # Standardize the features
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(df_train_x)
+X_test_scaled = scaler.fit_transform(df_test_x)
 
 # Logistic Regression
 from sklearn.linear_model import LogisticRegression
 logit_model = LogisticRegression(random_state=1)
 logit_model.fit(X_train_scaled, df_train_y)
-
+performance['logit'] = logit_model.score(X_test_scaled,df_test_y)
 # Extract feature coefficients (importance)
 logit_coefficients = logit_model.coef_[0]
 logit_coefficients = normalize_coef(logit_coefficients)
@@ -414,11 +414,10 @@ logit_coefficients = normalize_coef(logit_coefficients)
 # SVC
 from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler
-
 # Train an SVM with a linear kernel
 svm_model = SVC(kernel='linear', random_state=1)
 svm_model.fit(X_train_scaled, df_train_y)
-
+performance['svm'] = svm_model.score(X_test_scaled,df_test_y)
 # Extract feature coefficients (importance)
 svm_coefficients = svm_model.coef_[0]
 svm_coefficients = normalize_coef(svm_coefficients)
@@ -427,10 +426,17 @@ svm_coefficients = normalize_coef(svm_coefficients)
 from sklearn.linear_model import Lasso
 lasso_model = Lasso(alpha=0.1, random_state=1)
 lasso_model.fit(X_train_scaled, df_train_y)
-
+performance['lasso'] = lasso_model.score(X_test_scaled,df_test_y)
 # Extract feature coefficients (importance)
 lasso_coefficients = lasso_model.coef_
 lasso_coefficients = normalize_coef(lasso_coefficients)
+
+# Neural Network
+from sklearn.neural_network import MLPRegressor
+model = MLPRegressor(hidden_layer_sizes=(100,), activation='relu', max_iter=500)
+model.fit(df_train_x,df_train_y)
+performance['neural network'] = model.score(df_test_x,df_test_y)
+
 
 #Normalize knn_scaling_factors
 knn_scaling_factors = normalize_coef(knn_scaling_factors)
@@ -444,7 +450,9 @@ importance_df = pd.DataFrame({
     'Logit': logit_coefficients,
     'Lasso' : lasso_coefficients
 }).sort_values(by='KNN',ascending=False)
+importance_df
 
-print(importance_df)
+# %%
+performance
 
 # %%
