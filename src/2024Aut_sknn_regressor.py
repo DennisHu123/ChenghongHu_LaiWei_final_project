@@ -322,7 +322,7 @@ class sknn:
         """
         history = []
         maxi = max( self.max_iter, maxiter)
-        skip_n = 100 # rule of thumb math.floor(1/learning_rate)
+        skip_n = 5 # rule of thumb math.floor(1/learning_rate)
         expos = scaleExpos_init 
         if (len(scaleExpos_init) == self.__xdim): self.__scaleExpos = scaleExpos_init # assumes the new input is the desired region.
         print(f"Begin: \nmodel score-train is {self.scorethis(use='train')}, \nscore-test is {self.scorethis(use='test')}, \nmaxi= {maxi}, k={self.k}, learning_rate={self.learning_rate}\n")
@@ -365,7 +365,7 @@ class sknn:
 ###### END class sknn
 
 #%%
-diabetes = sknn(data_x=df_x, data_y=df_y, k=13, classifier=False, learning_rate_init=0.2)
+diabetes = sknn(data_x=df_x, data_y=df_y, k=13, classifier=False, learning_rate_init=0.4)
 history,knn_scaling_factors = diabetes.optimize()
 df_history = pd.DataFrame(columns=['iteration','grad_square','train_score','test_score'])
 for row in history:
@@ -441,6 +441,9 @@ performance['neural network'] = model.score(df_test_x,df_test_y)
 #Normalize knn_scaling_factors
 knn_scaling_factors = normalize_coef(knn_scaling_factors)
 
+# %%
+performance
+#%%
 # Display feature importance
 importance_df = pd.DataFrame({
     'Feature': df_train_x.columns,
@@ -450,9 +453,19 @@ importance_df = pd.DataFrame({
     'Logit': logit_coefficients,
     'Lasso' : lasso_coefficients
 }).sort_values(by='KNN',ascending=False)
-importance_df
+importance_df.head(10)
 
 # %%
-performance
+tree_importance_df = pd.DataFrame({
+    'Feature': df_train_x.columns,
+    'Tree': tree_feature_importance
+}).sort_values(by='Tree',ascending=False)
+tree_importance_df.head(10)
 
+#%%
+lasso_importance_df = pd.DataFrame({
+    'Feature': df_train_x.columns,
+    'Lasso' : lasso_coefficients
+}).sort_values(by='Lasso',ascending=False)
+lasso_importance_df.head(10)
 # %%
