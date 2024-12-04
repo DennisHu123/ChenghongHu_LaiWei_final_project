@@ -403,13 +403,13 @@ X_train_scaled = scaler.fit_transform(df_train_x)
 X_test_scaled = scaler.fit_transform(df_test_x)
 
 # Logistic Regression
-from sklearn.linear_model import LogisticRegression
-logit_model = LogisticRegression(random_state=1)
-logit_model.fit(X_train_scaled, df_train_y)
-performance['logit'] = logit_model.score(X_test_scaled,df_test_y)
+from sklearn.linear_model import LinearRegression
+linear_model = LinearRegression()
+linear_model.fit(df_train_x, df_train_y)
+performance['Linear'] = linear_model.score(df_test_x,df_test_y)
 # Extract feature coefficients (importance)
-logit_coefficients = logit_model.coef_[0]
-logit_coefficients = normalize_coef(logit_coefficients)
+linear_coefficients = linear_model.coef_
+linear_coefficients = normalize_coef(linear_coefficients)
 
 # SVC
 from sklearn.svm import SVC
@@ -450,7 +450,7 @@ importance_df = pd.DataFrame({
     'KNN': knn_scaling_factors,
     'Tree': tree_feature_importance,
     'SVM' : svm_coefficients,
-    'Logit': logit_coefficients,
+    'Linear': linear_coefficients,
     'Lasso' : lasso_coefficients
 }).sort_values(by='KNN',ascending=False)
 importance_df.head(10)
