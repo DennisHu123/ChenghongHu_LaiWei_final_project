@@ -373,7 +373,8 @@ for row in history:
 
 #%%
 df_history
-
+#%%
+knn_scaling_factors
 # %%
 # Compare with other models
 # Tree Regressor
@@ -461,6 +462,13 @@ tree_importance_df = pd.DataFrame({
     'Tree': tree_feature_importance
 }).sort_values(by='Tree',ascending=False)
 tree_importance_df.head(10)
+
+# %%
+linear_importance_df = pd.DataFrame({
+    'Feature': df_train_x.columns,
+    'Linear': linear_coefficients
+}).sort_values(by='Linear',ascending=False)
+linear_importance_df.head(10)
 
 #%%
 lasso_importance_df = pd.DataFrame({
