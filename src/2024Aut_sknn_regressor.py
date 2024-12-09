@@ -364,21 +364,53 @@ class sknn:
 
 ###### END class sknn
 
+#%%[markdown]
+# We chose k=13 because it gives the highest model score in basic K-NN regressors.
+# We set learning rate to be 0.4 and max_iter to be 50 because this gives a higher rate of convergence
+# and saves computation time. Also it achieves a higher test score while preventing overfitting at the same time.
+
 #%%
-diabetes = sknn(data_x=df_x, data_y=df_y, k=13, classifier=False, learning_rate_init=0.4)
+diabetes = sknn(data_x=df_x, data_y=df_y, k=13, classifier=False, max_iter=50, learning_rate_init=0.4)
 history,knn_scaling_factors = diabetes.optimize()
 df_history = pd.DataFrame(columns=['iteration','grad_square','train_score','test_score'])
 for row in history:
     df_history.loc[len(df_history)] = row
 
 #%%
+# Here is an organized view of training history
 df_history
+
+#%%[markdown]
+# We can see that the scaling K-NN regressor does a pretty good job as it obtains a test score of 0.807.
+# Also, we can observe that the test score fluctuates around 0.807 for many epochs starting from
+# epoch 10, which probably implies that we have achieved the best score we can get on this dataset using scaling
+# k-NN. The grad_square is getting smaller and smaller, which supports the above implication.
+#
+# Now let's look at the scaling factors. Which features are more important and which features are less
+# important according to the algorithm.
+
 #%%
-knn_scaling_factors
+# Top 20 Important Features
+knn_importance_df = pd.DataFrame({
+    'Feature': df_x.columns,
+    'scaling_factor': knn_scaling_factors,
+}).sort_values(by='scaling_factor',ascending=False)
+knn_importance_df.head(20)
+
+#%%
+# Bottom 20 Important Features
+knn_importance_df = pd.DataFrame({
+    'Feature': df_x.columns,
+    'scaling_factor': knn_scaling_factors,
+}).sort_values(by='scaling_factor',ascending=True)
+knn_importance_df.head(20)
+
+
 # %%
 # Compare with other models
 # Tree Regressor
 performance = {}
+performance['KNN'] = df_history.iloc[-1,3]
 from sklearn.model_selection import train_test_split
 dy = df_y.values if (isinstance(df_y, pd.core.series.Series) or isinstance(df_y, pd.core.frame.DataFrame)) else df_y # if (isinstance(data_y, np.ndarray)) # the default
 df_train_x, df_test_x, df_train_y, df_test_y = train_test_split(df_x, dy, test_size=0.5, random_state = 1)
@@ -418,7 +450,7 @@ from sklearn.preprocessing import StandardScaler
 # Train an SVM with a linear kernel
 svm_model = SVC(kernel='linear', random_state=1)
 svm_model.fit(X_train_scaled, df_train_y)
-performance['svm'] = svm_model.score(X_test_scaled,df_test_y)
+# performance['svm'] = svm_model.score(X_test_scaled,df_test_y)
 # Extract feature coefficients (importance)
 svm_coefficients = svm_model.coef_[0]
 svm_coefficients = normalize_coef(svm_coefficients)
@@ -443,20 +475,26 @@ performance['neural network'] = model.score(df_test_x,df_test_y)
 knn_scaling_factors = normalize_coef(knn_scaling_factors)
 
 # %%
+# Compare the performance of scaling k-NN with that of other models.
 performance
+
+#%%[markdown]
+# The accuray of scaling k-NN is pretty high. Next let's look at how different models rank 
+# the importance of features. To implement this, we normalize the coefficients and feature importance
+# from each model so that they can be compared together.
 #%%
-# Display feature importance
+# Display feature importance (Ranked by kNN scaling factor)
 importance_df = pd.DataFrame({
     'Feature': df_train_x.columns,
     'KNN': knn_scaling_factors,
     'Tree': tree_feature_importance,
-    'SVM' : svm_coefficients,
     'Linear': linear_coefficients,
     'Lasso' : lasso_coefficients
 }).sort_values(by='KNN',ascending=False)
 importance_df.head(10)
 
 # %%
+# Tree - Top 10 Important Features
 tree_importance_df = pd.DataFrame({
     'Feature': df_train_x.columns,
     'Tree': tree_feature_importance
@@ -464,6 +502,7 @@ tree_importance_df = pd.DataFrame({
 tree_importance_df.head(10)
 
 # %%
+# Linear Regression - Top 10 Important Features
 linear_importance_df = pd.DataFrame({
     'Feature': df_train_x.columns,
     'Linear': linear_coefficients
@@ -471,6 +510,7 @@ linear_importance_df = pd.DataFrame({
 linear_importance_df.head(10)
 
 #%%
+# Lasso Regression - Top 10 Important Features
 lasso_importance_df = pd.DataFrame({
     'Feature': df_train_x.columns,
     'Lasso' : lasso_coefficients
